@@ -2,8 +2,10 @@ import numpy as np
 from scipy import interpolate
 import matplotlib.pyplot as plt
 import shapely.geometry as geom
+import h5py
 
 fig, ax = plt.subplots()
+
 
 def circle(R, x0, y0, t0, t1):
     t=np.arange(t0, t1, 0.1)
@@ -96,7 +98,6 @@ coords_16 = circle(200, 1802, 1448, -2, -0.9)
 x = np.append(x, coords_16[0])
 y = np.append(y, coords_16[1])
 
-
 coords_line = np.array([[1915, 1915], [1283, 1435]])
 x = np.append(x, coords_line[0])
 y = np.append(y, coords_line[1])
@@ -117,7 +118,7 @@ for i in range(len(spline_curve[0])):
     coords.append([spline_curve[0][i], spline_curve[1][i]])
 
 poly = geom.Polygon(coords)
-pointsnumber = 100
+pointsnumber = 500
 x_limits = [0, 1916]
 y_limits = [0, 1436]
 
@@ -131,49 +132,52 @@ for x_coord in np.linspace(*x_limits, pointsnumber):
 
 x = np.array(points_x)
 y = np.array(points_y)
-points_new = []
+
+
+float_type = np.float64
+int_type = np.int32
+
+box_size = 2000
+
+gas_part_num = len(x)
+gas_coords = np.zeros([gas_part_num, 3], dtype=float_type)
 for i in range(len(x)):
-    points_new.append([x[i], y[i]])
-print(y)
-t = 5*np.sin((np.sqrt((x-0.75)**2+y**2)+1)/0.05)
-rho=[]
-x_new=[]
-y_new=[]
-print(len(x))
-for point in points_new:
-    if point[0]>970 and point[0]<1050 and point[1]<590 and point[1]>530:
-      rho.append(10)
-      x_new.append(point[0])
-      y_new.append(point[1])
-    elif point[0]>900 and point[0]<1110 and point[1]<600 and point[1]>510:
-      rho.append(8)
-      x_new.append(point[0])
-      y_new.append(point[1])  #rho=x*k0+y*k1
-    elif point[0]>670 and point[0]<1200 and point[1]<1000 and point[1]>350:
-      rho.append(7)
-      x_new.append(point[0])
-      y_new.append(point[1])
-    elif point[0]>670 and point[0]<1200 and point[1]<1430 and point[1]>1000:
-      rho.append(6)
-      x_new.append(point[0])
-      y_new.append(point[1])
-    elif point[0]>250 and point[0]<670 and point[1]<1430 and point[1]>1200:
-      rho.append(4)
-      x_new.append(point[0])
-      y_new.append(point[1])
-    elif point[0]>0 and point[0]<250 and point[1]<1000 and point[1]>800:
-      rho.append(4)
-      x_new.append(point[0])
-      y_new.append(point[1])
-    else:
-      rho.append(0)
-      x_new.append(point[0])
-      y_new.append(point[1])  
+    gas_coords[i][0] = x[i]
+    gas_coords[i][1] = y[i]
+gas_vel = np.ndarray([gas_part_num, 3], dtype=float_type)
+gas_masses = np.ones(gas_part_num, dtype=float_type)
 
 
-points = ax.scatter(x_new, y_new, c=rho)
+##############################################
+IC = h5py.File('IC_1.hdf5', 'w')
+header = IC.create_group("Header")
+part0 = IC.create_group("PartType0")
 
-c_bar = fig.colorbar(points)
-plt.xlim([0, 1916])
-plt.ylim([1450, 0])
-plt.savefig('horse_test.png')
+KEY_STUB = 0
+KEY_STUB_ARRAY = np.ones(6, dtype = int_type)
+num_part = np.array([gas_part_num, 0, 0, 0, 0, 0], dtype=int_type)
+header.attrs.create("NumPart_ThisFile", num_part)
+header.attrs.create("NumPart_Total_HighWord", np.zeros(6, dtype=int_type))
+header.attrs.create("NumPart_Total", num_part)
+header.attrs.create("MassTable", KEY_STUB_ARRAY)
+header.attrs.create("Time", KEY_STUB)
+header.attrs.create("BoxSize", KEY_STUB)
+header.attrs.create("Redshift", KEY_STUB)
+header.attrs.create("Omega0", KEY_STUB)
+header.attrs.create("OmegaB", KEY_STUB)
+header.attrs.create("OmegaLambda", KEY_STUB)
+header.attrs.create("HubbleParam", KEY_STUB)
+header.attrs.create("Flag_Sfr", KEY_STUB)
+header.attrs.create("Flag_Cooling", KEY_STUB)
+header.attrs.create("Flag_StellarAge", KEY_STUB)
+header.attrs.create("Flag_Metals", KEY_STUB)
+header.attrs.create("Flag_Feedback", KEY_STUB)
+header.attrs.create("NumFilesPerSnapshot", KEY_STUB)
+header.attrs.create("Flag_DoublePrecision", 1)
+
+part0.create_dataset("ParticleIDs", data=np.arange(0, gas_part_num))
+part0.create_dataset("Coordinates", data=gas_coords)
+part0.create_dataset("Velocities", data=gas_vel)
+part0.create_dataset("Masses", data=gas_masses)
+
+IC.close()
